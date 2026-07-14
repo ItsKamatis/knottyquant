@@ -1,0 +1,12 @@
+component,amount,pnl_component
+Opening model value,-67315.70836316003,False
+Carry / roll and fixing realization,-7.616699440870434,True
+Curve movement,3601.5538839870133,True
+Amendments,-10052.349328801036,True
+New-trade model value at close,18284.140686850995,True
+Cash flows,12500.0,True
+Explained portfolio value change,24325.7285425961,False
+Closing model value,-55489.97982056392,False
+External closing mark,,False
+External-mark residual,,False
+Value-change identity difference,0.0,False

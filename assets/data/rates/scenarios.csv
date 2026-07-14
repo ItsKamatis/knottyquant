@@ -1,0 +1,17 @@
+scenario,trade_id,base_npv,shocked_npv,scenario_pnl,method
+parallel_up,S001,73717.22841120511,-173355.9918729351,-247073.2202841402,quote_shock_full_rebootstrap_full_revaluation
+parallel_up,S002,-147491.34891862003,80519.45580750192,228010.80472612195,quote_shock_full_rebootstrap_full_revaluation
+parallel_up,S003,18284.140686850995,-73477.4149429563,-91761.55562980729,quote_shock_full_rebootstrap_full_revaluation
+parallel_up,TOTAL,-55489.97982056392,-166313.95100838947,-110823.97118782555,quote_shock_full_rebootstrap_full_revaluation
+parallel_down,S001,73717.22841120511,324338.5467245206,250621.3183133155,quote_shock_full_rebootstrap_full_revaluation
+parallel_down,S002,-147491.34891862003,-379854.3380705016,-232362.98915188154,quote_shock_full_rebootstrap_full_revaluation
+parallel_down,S003,18284.140686850995,111172.86780000268,92888.72711315169,quote_shock_full_rebootstrap_full_revaluation
+parallel_down,TOTAL,-55489.97982056392,55657.076454021735,111147.05627458566,quote_shock_full_rebootstrap_full_revaluation
+steepener,S001,73717.22841120511,241343.38168198802,167626.1532707829,quote_shock_full_rebootstrap_full_revaluation
+steepener,S002,-147491.34891862003,-270985.6963282237,-123494.34740960365,quote_shock_full_rebootstrap_full_revaluation
+steepener,S003,18284.140686850995,84581.14014489623,66296.99945804523,quote_shock_full_rebootstrap_full_revaluation
+steepener,TOTAL,-55489.97982056392,54938.82549866056,110428.80531922448,quote_shock_full_rebootstrap_full_revaluation
+flattener,S001,73717.22841120511,-92122.30965917977,-165839.53807038488,quote_shock_full_rebootstrap_full_revaluation
+flattener,S002,-147491.34891862003,-25528.318425212055,121963.03049340798,quote_shock_full_rebootstrap_full_revaluation
+flattener,S003,18284.140686850995,-47373.63002926251,-65657.7707161135,quote_shock_full_rebootstrap_full_revaluation
+flattener,TOTAL,-55489.97982056392,-165024.25811365433,-109534.2782930904,quote_shock_full_rebootstrap_full_revaluation
