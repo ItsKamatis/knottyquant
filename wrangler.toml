@@ -1,0 +1,5 @@
+name = "knottyquant"
+compatibility_date = "2026-07-14"
+
+[site]
+bucket = "./dist"
