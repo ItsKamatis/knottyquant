@@ -4,10 +4,12 @@ import sitemap from '@astrojs/sitemap';
 import { unified } from '@astrojs/markdown-remark';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import cloudflare from '@astrojs/cloudflare'; // 1. Import the adapter
 
 export default defineConfig({
   site: 'https://knottyquant.com',
-  output: 'static',
+  output: 'server', // 2. Change output to server for full Cloudflare runtime compliance
+  adapter: cloudflare(), // 3. Add the adapter here
   trailingSlash: 'never',
   build: {
     format: 'file',
