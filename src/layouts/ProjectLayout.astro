@@ -1,0 +1,79 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  entry: CollectionEntry<'projects'>;
+}
+
+const { entry } = Astro.props;
+const { data } = entry;
+const canonical = `/${data.slug}.html`;
+const organization = {
+  '@type': 'Organization',
+  name: 'KnottyQuant',
+  url: 'https://knottyquant.com/',
+};
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: data.title,
+  description: data.seoDescription,
+  datePublished: data.date.toISOString(),
+  author: organization,
+  publisher: organization,
+  mainEntityOfPage: `https://knottyquant.com${canonical}`,
+  image: `https://knottyquant.com${data.heroImage}`,
+};
+---
+
+<BaseLayout
+  title={data.title}
+  description={data.seoDescription}
+  pageType="article"
+  imageAlt={data.heroAlt}
+  canonicalPath={canonical}
+  structuredData={structuredData}
+>
+  <header class="article-hero page-shell">
+    <div>
+      <p class="eyebrow">Research project · {data.date.getUTCFullYear()}</p>
+      <h1>{data.title}</h1>
+      <p class="article-deck">{data.summary}</p>
+    </div>
+    <aside class="question-card">
+      <span>Research question</span>
+      <p>{data.researchQuestion}</p>
+    </aside>
+  </header>
+
+  <div class="project-meta page-shell">
+    <p><strong>Data boundary:</strong> {data.dataBoundary}</p>
+    <ul class="tag-list" aria-label="Techniques">
+      {data.techniques.map((technique) => <li>{technique}</li>)}
+    </ul>
+    <div class="action-row">
+      {data.repository && (
+        <a class="button primary" href={data.repository} target="_blank" rel="noreferrer">Github repository</a>
+      )}
+      {data.artifacts.map((artifact) => (
+        <a class:list={['button', { primary: !data.repository && artifact === data.artifacts[0] }]} href={artifact.url} target={artifact.url.startsWith('http') ? '_blank' : undefined} rel={artifact.url.startsWith('http') ? 'noreferrer' : undefined}>{artifact.label}</a>
+      ))}
+    </div>
+  </div>
+
+  <div class="article-grid page-shell">
+    <nav class="article-toc" aria-label="Project contents">
+      <p class="eyebrow">Contents</p>
+      <a href="#overview"><span>01</span>Overview</a>
+      <a href="#data-and-assumptions"><span>02</span>Data and assumptions</a>
+      <a href="#method"><span>03</span>Method</a>
+      <a href="#implementation"><span>04</span>Implementation</a>
+      <a href="#results-and-checks"><span>05</span>Results and checks</a>
+      <a href="#limitations-and-materials"><span>06</span>Limitations and materials</a>
+    </nav>
+    <article class="article-body">
+      <slot />
+    </article>
+  </div>
+</BaseLayout>

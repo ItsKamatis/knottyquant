@@ -1,0 +1,22 @@
+---
+const path = Astro.url.pathname;
+const projectRoutes = new Set([
+  '/sofr-curve-swap-risk.html',
+  '/portfolio-construction.html',
+  '/volatility-surface-research.html',
+]);
+const researchActive = path === '/research.html' || projectRoutes.has(path);
+const writingActive = path === '/writing.html' || path.startsWith('/writing/');
+const aboutActive = path === '/about.html';
+---
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="site-mark" href="/" aria-label="KnottyQuant home">KnottyQuant</a>
+    <nav aria-label="Primary navigation">
+      <a href="/research.html" aria-current={researchActive ? 'page' : undefined}>Research</a>
+      <a href="/writing.html" aria-current={writingActive ? 'page' : undefined}>Writing</a>
+      <a href="/about.html" aria-current={aboutActive ? 'page' : undefined}>About</a>
+    </nav>
+  </div>
+</header>

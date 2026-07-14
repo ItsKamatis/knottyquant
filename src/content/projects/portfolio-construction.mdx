@@ -1,0 +1,192 @@
+---
+title: "Constrained Portfolio Construction and Factor Attribution"
+slug: "portfolio-construction"
+summary: "A walk-forward comparison of portfolio construction methods under position, tracking-error, turnover, transaction-cost, factor-exposure, and exact-cardinality constraints."
+researchQuestion: "Given noisy estimates, how do portfolio objectives and practical constraints change the weights, risk, turnover, and attribution that follow?"
+date: 2026-07-08
+order: 2
+featured: true
+techniques:
+  - "Ledoit–Wolf covariance"
+  - "Mean–variance optimization"
+  - "Historical CVaR"
+  - "CVXPY"
+  - "SciPy / HiGHS MILP"
+  - "Tracking error"
+  - "Factor attribution"
+dataBoundary: "Public figures use a deterministic synthetic panel. A retained CRSP-derived price panel is evaluated locally without live WRDS access and is not published."
+repository: "https://github.com/ItsKamatis/constrained-portfolio-construction"
+artifacts:
+  - label: "Portfolio summary"
+    url: "/assets/data/portfolio/summary.csv"
+    kind: "data"
+  - label: "Bootstrap intervals"
+    url: "/assets/data/portfolio/bootstrap_uncertainty.csv"
+    kind: "data"
+  - label: "Attribution"
+    url: "/assets/data/portfolio/active_attribution.csv"
+    kind: "data"
+heroImage: "/images/research/portfolio-tradeoffs.png"
+heroAlt: "Synthetic portfolio return, volatility, and turnover trade-offs"
+heroWidth: 2151
+heroHeight: 1215
+seoDescription: "A Python portfolio-construction framework comparing mean-variance, CVaR, benchmark-relative, turnover-constrained, and exact-cardinality methods with factor attribution."
+---
+
+import ResearchFigure from '../../components/ResearchFigure.astro';
+import DataBoundary from '../../components/DataBoundary.astro';
+import EvidenceTable from '../../components/EvidenceTable.astro';
+import Limitations from '../../components/Limitations.astro';
+import CodeExcerpt from '../../components/CodeExcerpt.astro';
+
+<section id="overview">
+
+<h2>Overview</h2>
+
+This project studies the layer between an estimated return distribution and a feasible portfolio. The focus is not a return forecast by itself, but the decisions that follow: covariance shrinkage, downside objectives, benchmark-relative risk, transaction costs, exposure controls, and discrete holding counts.
+
+<div class="result-grid">
+  <div><span>Public universe</span><strong>12 synthetic assets</strong></div>
+  <div><span>Holding periods</span><strong>72 monthly decisions</strong></div>
+  <div><span>Main comparison</span><strong>7 long-only methods</strong></div>
+  <div><span>Cardinality</span><strong>Exactly 8 holdings</strong></div>
+</div>
+
+The public run is an engineering demonstration. It is designed to expose method behavior and feasibility checks, not to establish alpha or an investable strategy.
+
+</section>
+
+<section id="data-and-assumptions">
+
+<span id="design" class="anchor-alias"></span>
+
+<h2>Data and assumptions</h2>
+
+The published demonstration uses deterministic synthetic asset and factor returns. Twelve assets are rebalanced monthly from January 2020 through December 2025 after a 2018–2019 estimation warm-up. Method development covers 2020–2023; 2024–2025 is already inspected and is labeled accordingly rather than called a pristine test.
+
+<DataBoundary>
+The external adapter has been exercised on retained CRSP-derived price history without a live WRDS connection. Those rows, weights, and performance outputs are not distributed. The retained panel is split-adjusted price history without dividends and uses a current-constituent universe, so it carries a survivorship boundary.
+</DataBoundary>
+
+Portfolio weights for month $t$ use information dated through $t-1$. Missing returns are not replaced with zero. Before the next rebalance, prior weights drift with realized returns; turnover and costs are computed from those drifted weights.
+
+$$
+\hat\mu_i=0.5\bar\mu_i+0.5\bar\mu_{\mathrm{grand}},
+\qquad
+\tau_t=\frac{1}{2}\sum_i\left|w_{i,t}-\widetilde w_{i,t-1}\right|.
+$$
+
+</section>
+
+<section id="method">
+
+<span id="methods" class="anchor-alias"></span>
+
+<h2>Method</h2>
+
+Expected returns use 50% shrinkage toward the cross-sectional grand mean. Covariance uses Ledoit–Wolf shrinkage. The comparison is deliberately curated: each method represents a distinct construction question rather than another solver configuration.
+
+<EvidenceTable label="Portfolio construction methods">
+  <table>
+    <thead><tr><th>Method</th><th>Objective</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>Equal weight</td><td>None</td><td>Reference portfolio</td></tr>
+      <tr><td>Global minimum variance</td><td>Minimize variance</td><td>Risk-only baseline</td></tr>
+      <tr><td>Shrinkage mean–variance</td><td>Return minus risk penalty</td><td>Noisy-forecast allocation</td></tr>
+      <tr><td>Maximum estimated Sharpe</td><td>Best solved frontier point</td><td>Explicit GMV fallback when excess return is nonpositive</td></tr>
+      <tr><td>Historical joint CVaR</td><td>Minimize empirical 95% loss CVaR</td><td>Downside-risk objective</td></tr>
+      <tr><td>Benchmark-relative</td><td>Active utility net of turnover penalty</td><td>Tracking error, turnover, and factor controls</td></tr>
+      <tr><td>Exact-cardinality CVaR</td><td>CVaR with binary selection</td><td>Exactly eight holdings</td></tr>
+    </tbody>
+  </table>
+</EvidenceTable>
+
+The benchmark-relative default uses a 20% position cap, 8% ex-ante tracking-error limit, 30% one-way turnover limit, active Fama–French five-factor plus momentum controls, and a 10 bp one-way transaction-cost model. The cardinality formulation uses 1%–25% weights when selected.
+
+The 130/30 formulation is kept as a mathematical appendix rather than included in the main comparison because the project does not model borrow availability, fees, recalls, financing, margin, or market impact.
+
+</section>
+
+<section id="implementation">
+
+<span id="constraints" class="anchor-alias"></span>
+
+<h2>Implementation</h2>
+
+The continuous problems are expressed in CVXPY. A benchmark-relative weight vector is constrained against the eligible-universe benchmark, prior drifted weights, the covariance estimate, and lagged factor exposures.
+
+<CodeExcerpt
+  label="src/constrained_portfolio/optimization.py — benchmark-relative constraints"
+  code={'w = cp.Variable(len(assets))\nactive = w - benchmark\nconstraints = [\n    cp.sum(w) == 1,\n    w >= 0,\n    w <= max_weight,\n    cp.quad_form(active, cp.psd_wrap(sigma))\n        <= tracking_error_limit**2,\n]\n\none_way_turnover = 0.5 * (\n    cp.norm1(w - prior) + outside_prior_absolute_weight\n)\nconstraints.append(one_way_turnover <= turnover_limit)\nconstraints.extend([\n    active_factor <= tolerance,\n    active_factor >= -tolerance,\n])'}
+/>
+
+Exact-cardinality CVaR is a mixed-integer linear program solved through SciPy’s HiGHS interface. Binary selection variables are linked to continuous weights, and the selected count is fixed before the loss-slack constraints are added.
+
+<CodeExcerpt
+  label="src/constrained_portfolio/optimization.py — exact-count and weight-selection links"
+  code={'count = np.zeros(n_variables)\ncount[z_slice] = 1.0\nrows.append(count)\nlb.append(float(cardinality))\nub.append(float(cardinality))\n\nfor asset in range(n_assets):\n    upper_link = np.zeros(n_variables)\n    upper_link[asset] = 1.0\n    upper_link[n_assets + asset] = -maximum_weight\n    rows.append(upper_link)\n    lb.append(-np.inf)\n    ub.append(0.0)\n\n    lower_link = np.zeros(n_variables)\n    lower_link[asset] = -1.0\n    lower_link[n_assets + asset] = minimum_weight\n    rows.append(lower_link)\n    lb.append(-np.inf)\n    ub.append(0.0)'}
+/>
+
+</section>
+
+<section id="results-and-checks">
+
+<span id="evidence" class="anchor-alias"></span>
+
+<h2>Results and checks</h2>
+
+The synthetic paths show how construction rules trade return, volatility, and turnover under the same dated panel and cost model. They are not interpreted as market performance.
+
+<ResearchFigure
+  src="/images/research/portfolio-growth.png"
+  width={2256}
+  height={1215}
+  alt="Growth of one dollar for six representative synthetic long-only portfolio methods"
+  caption="Six representative long-only methods from the deterministic demonstration. The separate 130/30 appendix is omitted."
+  eager={true}
+/>
+
+<ResearchFigure
+  src="/images/research/portfolio-tradeoffs.png"
+  width={2151}
+  height={1215}
+  alt="Synthetic annualized return, volatility, and turnover by portfolio method"
+  caption="Return, volatility, and turnover are computed from the same deterministic run and 10 bp one-way cost assumption."
+/>
+
+<span id="attribution" class="anchor-alias"></span>
+
+Lagged rolling asset regressions estimate Fama–French five-factor plus momentum exposures. Monthly active return is reconciled into factor contributions, a specific residual, and transaction costs.
+
+<ResearchFigure
+  src="/images/research/portfolio-attribution.png"
+  width={2160}
+  height={1179}
+  alt="Synthetic benchmark-relative factor, specific, and transaction-cost contributions"
+  caption="Sums of monthly arithmetic contributions for the benchmark-relative method. The specific term is a reconciliation residual, not evidence of security-selection skill."
+/>
+
+<span id="validation" class="anchor-alias"></span>
+
+Every solution is checked against its stated budget, bound, tracking-error, turnover, exposure, and integrality conditions. The maximum-Sharpe rule used its documented GMV fallback in 19 of 72 months, and the exact-cardinality method selected eight assets in every published month.
+
+A six-month moving-block bootstrap reports 95% intervals for return, volatility, Sharpe ratio, and maximum drawdown. Every public-demo Sharpe interval crosses zero, so the project makes no statistical-performance claim.
+
+</section>
+
+<section id="limitations-and-materials">
+
+<span id="limits" class="anchor-alias"></span>
+
+<h2>Limitations and materials</h2>
+
+<Limitations>
+  <div><h3>Public evidence</h3><p>Displayed performance and attribution use synthetic assets and factors. They demonstrate the pipeline, not an empirical strategy.</p></div>
+  <div><h3>Retained data</h3><p>The local price panel omits dividends and uses a current-constituent universe, creating survivorship and total-return limitations.</p></div>
+  <div><h3>Tail estimation</h3><p>Private CVaR windows contain 18–29 complete monthly scenarios, often leaving only one or two observations in the 95% tail.</p></div>
+  <div><h3>Coverage</h3><p>Historical sector classifications and point-in-time benchmark weights are unavailable, so sector constraints and Brinson attribution are omitted.</p></div>
+</Limitations>
+
+The [Github repository](https://github.com/ItsKamatis/constrained-portfolio-construction), [Portfolio summary](/assets/data/portfolio/summary.csv), [bootstrap intervals](/assets/data/portfolio/bootstrap_uncertainty.csv), [monthly results](/assets/data/portfolio/monthly_results.csv), and [active-return attribution](/assets/data/portfolio/active_attribution.csv) provide the public demonstration record.
+
+</section>

@@ -1,0 +1,12 @@
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+__pycache__/
+*.py[cod]
+.server.*.log
+node_modules/
+dist/
+.astro/
+.wrangler/
+lighthouse-reports/

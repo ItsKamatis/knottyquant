@@ -1,0 +1,56 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  entry: CollectionEntry<'writing'>;
+}
+
+const { entry } = Astro.props;
+const { data } = entry;
+const canonical = `/writing/${data.slug}.html`;
+const organization = {
+  '@type': 'Organization',
+  name: 'KnottyQuant',
+  url: 'https://knottyquant.com/',
+};
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: data.title,
+  description: data.seoDescription,
+  datePublished: data.published.toISOString(),
+  ...(data.updated ? { dateModified: data.updated.toISOString() } : {}),
+  author: organization,
+  publisher: organization,
+  mainEntityOfPage: `https://knottyquant.com${canonical}`,
+};
+const published = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+}).format(data.published);
+---
+
+<BaseLayout
+  title={data.title}
+  description={data.seoDescription}
+  pageType="article"
+  canonicalPath={canonical}
+  structuredData={structuredData}
+>
+  <article class="writing-article">
+    <header class="writing-hero prose-width">
+      <p class="eyebrow">Writing · {published}</p>
+      <h1>{data.title}</h1>
+      <p class="article-deck">{data.summary}</p>
+      <ul class="tag-list" aria-label="Topics">
+        {data.topics.map((topic) => <li>{topic}</li>)}
+      </ul>
+    </header>
+    <div class="writing-body prose-width">
+      <slot />
+    </div>
+  </article>
+</BaseLayout>

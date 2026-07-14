@@ -1,0 +1,99 @@
+---
+import '@fontsource/source-serif-4/latin-500.css';
+import '@fontsource/source-serif-4/latin-600.css';
+import '@fontsource/ibm-plex-sans/latin-400.css';
+import '@fontsource/ibm-plex-sans/latin-500.css';
+import '@fontsource/ibm-plex-sans/latin-600.css';
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
+import 'katex/dist/katex.min.css';
+import '../styles/global.css';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  pageType?: 'website' | 'article';
+  imageAlt?: string;
+  structuredData?: Record<string, unknown> | Record<string, unknown>[];
+  noindex?: boolean;
+  canonicalPath?: string;
+}
+
+const {
+  title,
+  description,
+  pageType = 'website',
+  imageAlt = 'KnottyQuant quantitative research',
+  structuredData,
+  noindex = false,
+  canonicalPath,
+} = Astro.props;
+
+const site = Astro.site ?? new URL('https://knottyquant.com');
+const path = canonicalPath ?? Astro.url.pathname;
+const canonical = new URL(path === '/index.html' ? '/' : path, site);
+const socialImage = new URL('/og.png', site);
+const documentTitle = title === 'KnottyQuant' ? title : `${title} | KnottyQuant`;
+const siteStructuredData = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'KnottyQuant',
+    url: 'https://knottyquant.com/',
+    description: 'Quantitative research, projects, and writing on derivatives, risk, portfolio construction, numerical methods, and topology.',
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'KnottyQuant',
+    url: 'https://knottyquant.com/',
+    logo: 'https://knottyquant.com/images/favicon.svg',
+    sameAs: ['https://github.com/ItsKamatis'],
+  },
+];
+const additionalStructuredData = structuredData
+  ? (Array.isArray(structuredData) ? structuredData : [structuredData])
+  : [];
+const allStructuredData = [...siteStructuredData, ...additionalStructuredData];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{documentTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#F7F5EF" />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate" type="application/rss+xml" title="KnottyQuant writing" href="/rss.xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <meta property="og:site_name" content="KnottyQuant" />
+    <meta property="og:type" content={pageType} />
+    <meta property="og:title" content={documentTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={socialImage} />
+    <meta property="og:image:alt" content={imageAlt} />
+    <meta property="og:image:width" content="1730" />
+    <meta property="og:image:height" content="909" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={documentTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImage} />
+    <meta name="twitter:image:alt" content={imageAlt} />
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(allStructuredData)} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <SiteHeader />
+    <main id="main-content" tabindex="-1">
+      <slot />
+    </main>
+    <SiteFooter />
+  </body>
+</html>

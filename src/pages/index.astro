@@ -1,0 +1,66 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProjectCard from '../components/ProjectCard.astro';
+
+const projects = (await getCollection('projects'))
+  .filter(({ data }) => data.featured)
+  .sort((a, b) => a.data.order - b.data.order)
+  .slice(0, 3);
+const writing = (await getCollection('writing'))
+  .filter(({ data }) => data.status === 'published')
+  .sort((a, b) => b.data.published.getTime() - a.data.published.getTime());
+const latestWriting = writing[0];
+---
+
+<BaseLayout
+  title="KnottyQuant"
+  description="Quantitative research, projects, and writing on derivatives, risk, portfolio construction, numerical methods, and topology."
+  canonicalPath="/"
+>
+  <header class="home-hero page-shell">
+    <div>
+      <p class="eyebrow">Quantitative research</p>
+      <h1>KnottyQuant</h1>
+      <p class="home-deck">Quantitative research, projects, and writing on derivatives, risk, portfolio construction, numerical methods, and topology.</p>
+    </div>
+    <div class="why-note">
+      <h2>KnottyQuant?</h2>
+      <p>Knotty, naughty, all wound up? They say great things come in three, so what gives? Maybe all those 3 things are true. But what we’re here to discuss is the application of knot theory in the realm of finance. Can it really work, are there practical applications? </p>
+        <p>Knot theory is used to study entanglement in protein structures. In finance, the practical connection is broader topology and representing stock prices as strands of a braid.</p>
+
+    </div>
+  </header>
+
+  <section id="research" class="home-section page-shell" aria-labelledby="selected-work-title">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Selected work</p>
+        <h2 id="selected-work-title">Research and writing</h2>
+        <p>Methods, implementation evidence, and limitations from current research.</p>
+      </div>
+      <a class="text-link" href="/research.html">All research <span aria-hidden="true">→</span></a>
+    </div>
+
+    <div class="research-grid">
+      {projects.map((entry) => <ProjectCard entry={entry} compact />)}
+    </div>
+
+    {latestWriting && (
+      <article class="writing-preview">
+        <div>
+          <p class="eyebrow">Latest writing</p>
+          <time datetime={latestWriting.data.published.toISOString()}>
+            {latestWriting.data.published.getUTCFullYear()}
+          </time>
+        </div>
+        <div>
+          <h3><a href={`/writing/${latestWriting.data.slug}.html`}>{latestWriting.data.title}</a></h3>
+          <p>{latestWriting.data.summary}</p>
+          <a class="text-link" href={`/writing/${latestWriting.data.slug}.html`}>Read the essay <span aria-hidden="true">→</span></a>
+        </div>
+      </article>
+    )}
+
+  </section>
+</BaseLayout>

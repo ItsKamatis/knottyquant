@@ -1,0 +1,195 @@
+---
+title: "SOFR Curve Construction, Swap Risk, and Value-Change Decomposition"
+slug: "sofr-curve-swap-risk"
+summary: "A compact Python study of how dated SOFR OIS quotes become discount factors, vanilla swap values, quote-rebuilt risk, curve-shock results, and an opening-to-closing value-change explain."
+researchQuestion: "Can the curve, valuation, risk, and daily value-change mechanics be kept in one transparent and testable path?"
+date: 2026-07-02
+order: 1
+featured: true
+techniques:
+  - "SOFR OIS bootstrap"
+  - "Brent root solving"
+  - "Log-DF interpolation"
+  - "Swap valuation"
+  - "DV01"
+  - "Scenario revaluation"
+  - "Value-change attribution"
+dataBoundary: "OIS quotes, trades, amendments, and cash are synthetic. New York Fed SOFR and SOFR Index observations are real; Treasury yields provide context only."
+repository: "https://github.com/ItsKamatis/sofr-curve-swap-risk"
+artifacts:
+  - label: "Sample workbook"
+    url: "/assets/docs/SOFR_Curve_Swap_Risk_2026-07-02.xlsx"
+    kind: "document"
+  - label: "Curve nodes"
+    url: "/assets/data/rates/curve_nodes.csv"
+    kind: "data"
+  - label: "Key-rate DV01"
+    url: "/assets/data/rates/key_rate_dv01.csv"
+    kind: "data"
+heroImage: "/images/research/rates-curve.png"
+heroAlt: "Bootstrapped synthetic SOFR zero and forward curves with discount factors"
+heroWidth: 2418
+heroHeight: 1161
+seoDescription: "SOFR OIS curve construction, vanilla swap valuation, DV01, curve scenarios, and value-change attribution in a transparent Python research implementation."
+---
+
+import ResearchFigure from '../../components/ResearchFigure.astro';
+import DataBoundary from '../../components/DataBoundary.astro';
+import EvidenceTable from '../../components/EvidenceTable.astro';
+import Limitations from '../../components/Limitations.astro';
+import CodeExcerpt from '../../components/CodeExcerpt.astro';
+
+<section id="overview">
+
+<h2>Overview</h2>
+
+The project follows a dated USD SOFR workflow from market inputs to book-level valuation and risk. It deliberately uses one curve, one convention set, and a small synthetic trade book so that calibration, cash-flow generation, revaluation, and attribution can be inspected together.
+
+<div class="result-grid">
+  <div><span>Curve pillars</span><strong>13 tenors, 1W–30Y</strong></div>
+  <div><span>Closing book</span><strong>3 swaps / &#36;47m gross notional</strong></div>
+  <div><span>Closing model value</span><strong>−&#36;55,489.98</strong></div>
+  <div><span>Parallel DV01</span><strong>about &#36;4,439.54 per bp</strong></div>
+</div>
+
+The output is a research implementation, not an executable market curve or a production control system. The daily bridge is described as a **value-change explain**, because the sample does not contain independent entry consideration or an accounting P&amp;L record.
+
+</section>
+
+<section id="data-and-assumptions">
+
+<span id="curve" class="anchor-alias"></span>
+
+<h2>Data and assumptions</h2>
+
+The closing sample is dated 2 July 2026; the opening snapshot is 1 July. Thirteen synthetic OIS quotes span 1W through 30Y. The opening book has two swaps, and the closing book has three after the new trade is introduced.
+
+<DataBoundary>
+Real New York Fed SOFR and SOFR Index observations support realized compounding checks. U.S. Treasury par yields are retained as market context but never enter the SOFR bootstrap. The OIS quote snapshots and the complete trade workflow are synthetic.
+</DataBoundary>
+
+<EvidenceTable label="Rates data classification">
+  <table>
+    <thead><tr><th>Input</th><th>Status</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td>SOFR and SOFR Index</td><td>Real</td><td>Realized coupon input and compounding cross-check</td></tr>
+      <tr><td>Treasury par yields</td><td>Real</td><td>Context only</td></tr>
+      <tr><td>SOFR OIS quotes</td><td>Synthetic</td><td>Curve calibration and quote risk</td></tr>
+      <tr><td>Trades, amendments, and cash</td><td>Synthetic</td><td>Valuation, scenarios, and value-change attribution</td></tr>
+    </tbody>
+  </table>
+</EvidenceTable>
+
+The convention set is T+1 spot, annual fixed and floating payments, ACT/360, modified following, a two-USNY-business-day payment lag, linear interpolation in log discount factors, and no extrapolation beyond the final pillar.
+
+</section>
+
+<section id="method">
+
+<h2>Method</h2>
+
+Each OIS quote solves one new terminal discount factor while earlier pillars remain fixed. The root condition is
+
+$$
+q_i A_i(D) - PV_{\mathrm{float},i}(D)=0.
+$$
+
+Intermediate dates use log-linear discount-factor interpolation. Requests after the 30Y pillar fail explicitly rather than extending the curve silently.
+
+<ResearchFigure
+  src="/images/research/rates-curve.png"
+  width={2418}
+  height={1161}
+  alt="Synthetic SOFR zero and forward curves with discount factors"
+  caption="Thirteen solved pillars from 1W through 30Y. Treasury yields are not calibration inputs."
+  eager={true}
+/>
+
+<span id="swap" class="anchor-alias"></span>
+
+### Swap valuation
+
+Fixed and floating schedules are generated separately. A seasoned unpaid SOFR coupon combines realized daily fixings before the valuation date with forward discount-factor ratios over the remaining interval. Missing required fixings are errors rather than projected substitutes.
+
+$$
+C=\prod_i\left(1+r_i\frac{n_i}{360}\right),
+\qquad
+V=s\left(PV_{\mathrm{fixed}}-PV_{\mathrm{float}}\right).
+$$
+
+Parallel and key-rate DV01 use central quote bumps. Every bump rebuilds the complete curve and revalues every swap. The steepener and flattener apply opposing ±25 bp linear ramps between 1W and 30Y and also use full revaluation.
+
+</section>
+
+<section id="implementation">
+
+<h2>Implementation</h2>
+
+The bootstrap returns solved pillars and quote-repricing diagnostics. Risk functions store the original quote set, apply the requested perturbation, call the same bootstrap, and then pass the rebuilt curve to the swap pricer. There is no separate risk-only approximation path.
+
+<CodeExcerpt
+  label="src/sofr_curve/curve.py — one solved discount factor per quote"
+  code={'def objective(log_df: float) -> float:\n    candidate = DiscountCurve(\n        as_of,\n        tuple(pillar_dates + [pillar]),\n        np.array(dfs + [math.exp(log_df)]),\n        curve_name,\n    )\n    annuity, floating_pv, _ = _ois_leg_values(\n        quote, candidate, calendars, conventions\n    )\n    return quote.rate * annuity - floating_pv\n\nroot, result = brentq(\n    objective, -20.0, math.log(3.0),\n    xtol=1e-14, rtol=1e-14, full_output=True,\n)'}
+/>
+
+The same rebuild contract is used for a one-basis-point quote bump, a key-rate bump, and a shaped curve scenario. This makes risk results depend on the same conventions and numerical solver as the closing valuation.
+
+</section>
+
+<section id="results-and-checks">
+
+<span id="risk" class="anchor-alias"></span>
+
+<h2>Results and checks</h2>
+
+The sample book has desk-positive parallel DV01 of approximately &#36;4,439.54 per basis point. Its largest quote-node concentrations are around the 5Y and 7Y pillars.
+
+<ResearchFigure
+  src="/images/research/rates-risk.png"
+  width={2599}
+  height={1179}
+  alt="Net key-rate DV01 and full-revaluation curve-shock results"
+  caption="Key-rate DV01 and four full-revaluation scenarios. The scenario bars are not DV01 approximations."
+/>
+
+<div class="result-grid">
+  <div><span>Parallel +25 bp</span><strong>−&#36;110,823.97</strong></div>
+  <div><span>Parallel −25 bp</span><strong>+&#36;111,147.06</strong></div>
+  <div><span>Steepener</span><strong>+&#36;110,428.81</strong></div>
+  <div><span>Flattener</span><strong>−&#36;109,534.28</strong></div>
+</div>
+
+<span id="explain" class="anchor-alias"></span>
+
+The opening-to-closing bridge separates carry and fixing realization, the curve move, amendments, the new trade’s closing model value, and signed cash. The components sum to +&#36;24,325.73 with zero identity difference in the sample output.
+
+<ResearchFigure
+  src="/images/research/rates-value-change.png"
+  width={2166}
+  height={1160}
+  alt="Opening-to-closing value-change waterfall"
+  caption="The five components reconcile to the explained portfolio value change. This is not presented as verified desk economic P&L."
+/>
+
+<span id="validation" class="anchor-alias"></span>
+
+Quote repricing errors are below approximately 2.21×10⁻¹¹ bp in the source diagnostics. The reviewed source commit passed 27 tests covering discount-factor recovery, calendars, daily compounding, missing-fixing failures, DV01 signs, bump scaling, scenarios, amendments, cash, and provenance.
+
+</section>
+
+<section id="limitations-and-materials">
+
+<span id="limits" class="anchor-alias"></span>
+
+<h2>Limitations and materials</h2>
+
+<Limitations>
+  <div><h3>Market data</h3><p>The OIS levels and trade book are synthetic and are not described as executable dealer quotes.</p></div>
+  <div><h3>Curve scope</h3><p>The implementation is single-curve USD SOFR. Futures, basis curves, term SOFR, collateral optionality, and XVA are outside scope.</p></div>
+  <div><h3>Conventions</h3><p>The named calendars are transparent research approximations rather than licensed ISDA or SIFMA calendars.</p></div>
+  <div><h3>Use</h3><p>This is not a live curve service, trade store, accounting platform, independent price-verification process, or production risk system.</p></div>
+</Limitations>
+
+The [Github repository](https://github.com/ItsKamatis/sofr-curve-swap-risk), [sample workbook](/assets/docs/SOFR_Curve_Swap_Risk_2026-07-02.xlsx), [curve nodes](/assets/data/rates/curve_nodes.csv), [scenario results](/assets/data/rates/scenarios.csv), and [value-change components](/assets/data/rates/pnl_waterfall.csv) provide the public project record.
+
+</section>
